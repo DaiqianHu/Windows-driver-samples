@@ -176,6 +176,11 @@ Return Value:
 
 --*/
 {
+    //
+    // EvtCleanupCallback for WDFDRIVER is always called at PASSIVE_LEVEL
+    //
+    _IRQL_limited_to_(PASSIVE_LEVEL);
+
     PAGED_CODE ();
 
     TraceEvents(TRACE_LEVEL_INFORMATION, DBG_INIT,"<-- OsrFxEvtDriverContextCleanup\n");

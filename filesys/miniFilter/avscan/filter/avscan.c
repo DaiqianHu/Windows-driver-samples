@@ -409,9 +409,9 @@ Return Value:
         ExInitializeResourceLite( &instanceContext->Resource );
         
         RtlInitializeGenericTable( &instanceContext->FileStateCacheTable,
-                                   (PRTL_GENERIC_COMPARE_ROUTINE) AvCompareEntry,
-                                   (PRTL_GENERIC_ALLOCATE_ROUTINE) AvAllocateGenericTableEntry,
-                                   (PRTL_GENERIC_FREE_ROUTINE) AvFreeGenericTableEntry,
+                                    AvCompareEntry,
+                                    AvAllocateGenericTableEntry,
+                                    AvFreeGenericTableEntry,
                                    NULL );                                
     }
 
@@ -2093,7 +2093,7 @@ AvProcessPreviousTransaction (
 
 Routine Description:
 
-    This routine is transaction related implmentation, and is expected to be 
+    This routine is transaction related implementation, and is expected to be 
     invoked at post-create. Note that this function will enlist the newly 
     allocated transaction context via FltEnlistInTransaction if it needs to.
 

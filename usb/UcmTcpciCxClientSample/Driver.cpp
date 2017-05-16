@@ -150,6 +150,11 @@ Arguments:
 
 --*/
 {
+    //
+    // EvtCleanupCallback for WDFDRIVER is always called at PASSIVE_LEVEL
+    //
+    _IRQL_limited_to_(PASSIVE_LEVEL);
+
     TRACE_FUNC_ENTRY(TRACE_DRIVER);
 
     PAGED_CODE();

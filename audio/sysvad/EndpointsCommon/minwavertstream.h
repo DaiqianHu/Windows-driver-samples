@@ -125,6 +125,8 @@ protected:
     BOOLEAN                     m_bEoSReceived;
     BOOLEAN                     m_bLastBufferRendered;
     KSPIN_LOCK                  m_PositionSpinLock;
+    AUDIOMODULE *               m_pAudioModules;
+    ULONG                       m_AudioModuleCount;
 
 #ifdef SYSVAD_BTH_BYPASS
     BOOLEAN                     m_ScoOpen;
@@ -227,10 +229,45 @@ public:
     {
         return m_SignalProcessingMode;
     }
+    
+    NTSTATUS PropertyHandlerModulesListRequest
+    (
+        _In_ PPCPROPERTY_REQUEST PropertyRequest
+    );
+
+    NTSTATUS PropertyHandlerModuleCommand
+    (
+        _In_ PPCPROPERTY_REQUEST PropertyRequest
+    );
 
 private:
 
+    //
     // Helper functions.
+    //
+    
+#pragma code_seg()
+    ULONG
+    GetAudioModuleListCount()
+    {
+        return m_AudioModuleCount;
+    }
+
+    AUDIOMODULE *
+    GetAudioModule(
+        _In_ ULONG Index
+        )
+    {
+        ASSERT(Index < GetAudioModuleListCount());
+        return &m_pAudioModules[Index];
+    }
+
+    AUDIOMODULE *
+    GetAudioModuleList()
+    {
+        return m_pAudioModules;
+    }
+        
     VOID WriteBytes
     (
         _In_ ULONG ByteDisplacement
@@ -253,9 +290,9 @@ private:
     
     NTSTATUS GetPositions
     (
-        _Out_ ULONGLONG *pullLinearBufferPosition,
-        _Out_ ULONGLONG *pullPresentationPosition,
-        _Out_ LARGE_INTEGER *_pliQPCTime
+        _Out_opt_  ULONGLONG *      _pullLinearBufferPosition, 
+        _Out_opt_  ULONGLONG *      _pullPresentationPosition, 
+        _Out_opt_  LARGE_INTEGER *  _pliQPCTime
     );
 
 #ifdef SYSVAD_BTH_BYPASS

@@ -76,7 +76,7 @@ Return Value:
     WDFQUEUE                            queue;
     GUID                                activity;
     UNICODE_STRING                      symbolicLinkName;
-    WDFSTRING                           symbolicLinkString;
+    WDFSTRING                           symbolicLinkString = NULL;
     DEVPROP_BOOLEAN                     isRestricted;
 
     UNREFERENCED_PARAMETER(Driver);
@@ -165,22 +165,22 @@ Return Value:
                              WdfIoQueueDispatchParallel);
 
     ioQueueConfig.EvtIoDeviceControl    = OsrFxEvtIoDeviceControl;
-    
+
     //
-    // By default, Static Driver Verifier (SDV) displays a warning if it 
-    // doesn't find the EvtIoStop callback on a power-managed queue. 
-    // The 'assume' below causes SDV to suppress this warning. If the driver 
+    // By default, Static Driver Verifier (SDV) displays a warning if it
+    // doesn't find the EvtIoStop callback on a power-managed queue.
+    // The 'assume' below causes SDV to suppress this warning. If the driver
     // has not explicitly set PowerManaged to WdfFalse, the framework creates
-    // power-managed queues when the device is not a filter driver.  Normally 
+    // power-managed queues when the device is not a filter driver.  Normally
     // the EvtIoStop is required for power-managed queues, but for this driver
-    // it is not needed b/c the driver doesn't hold on to the requests for 
-    // long time or forward them to other drivers. 
+    // it is not needed b/c the driver doesn't hold on to the requests for
+    // long time or forward them to other drivers.
     // If the EvtIoStop callback is not implemented, the framework waits for
-    // all driver-owned requests to be done before moving in the Dx/sleep 
-    // states or before removing the device, which is the correct behavior 
+    // all driver-owned requests to be done before moving in the Dx/sleep
+    // states or before removing the device, which is the correct behavior
     // for this type of driver. If the requests were taking an indeterminate
     // amount of time to complete, or if the driver forwarded the requests
-    // to a lower driver/another stack, the queue should have an 
+    // to a lower driver/another stack, the queue should have an
     // EvtIoStop/EvtIoResume.
     //
     __analysis_assume(ioQueueConfig.EvtIoStop != 0);
@@ -189,7 +189,7 @@ Return Value:
                              WDF_NO_OBJECT_ATTRIBUTES,
                              &queue);// pointer to default queue
     __analysis_assume(ioQueueConfig.EvtIoStop == 0);
-    
+
     if (!NT_SUCCESS(status)) {
         TraceEvents(TRACE_LEVEL_ERROR, DBG_PNP,
                             "WdfIoQueueCreate failed  %!STATUS!\n", status);
@@ -308,9 +308,9 @@ Return Value:
         goto Error;
     }
 
-    // 
-    // Create the lock that we use to serialize calls to ResetDevice(). As an 
-    // alternative to using a WDFWAITLOCK to serialize the calls, a sequential 
+    //
+    // Create the lock that we use to serialize calls to ResetDevice(). As an
+    // alternative to using a WDFWAITLOCK to serialize the calls, a sequential
     // WDFQUEUE can be created and reset IOCTLs would be forwarded to it.
     //
     WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
@@ -363,13 +363,41 @@ Return Value:
                                                      sizeof(isRestricted),
                                                      &isRestricted );
 
-        WdfObjectDelete(symbolicLinkString);
-
         if (!NT_SUCCESS(status)) {
            TraceEvents(TRACE_LEVEL_ERROR, DBG_PNP,
-                     "IoSetDeviceInterfacePropertyData failed  %!STATUS!\n", status);
+                     "IoSetDeviceInterfacePropertyData failed to set restricted property  %!STATUS!\n", status);
             goto Error;
         }
+#if defined(NTDDI_WIN10_RS2) && (NTDDI_VERSION >= NTDDI_WIN10_RS2)
+
+        //
+        // Adding Custom Capability:
+        //
+        // Adds a custom capability to device interface instance that allows a Windows
+        // Store device app to access this interface using Windows.Devices.Custom namespace.
+        // This capability can be defined either in INF or here as shown below. In order
+        // to define it from the INF, uncomment the section "OsrUsb Interface installation"
+        // from the INF and remove the block of code below.
+        //
+
+        static const wchar_t customCapabilities[] = L"microsoft.hsaTestCustomCapability_q536wpkpf5cy2\0";
+
+        status = g_pIoSetDeviceInterfacePropertyData(&symbolicLinkName,
+                                                     &DEVPKEY_DeviceInterface_UnrestrictedAppCapabilities,
+                                                     0,
+                                                     0,
+                                                     DEVPROP_TYPE_STRING_LIST,
+                                                     sizeof(customCapabilities),
+                                                     (PVOID)&customCapabilities);
+
+        if (!NT_SUCCESS(status)) {
+            TraceEvents(TRACE_LEVEL_ERROR, DBG_PNP,
+                        "IoSetDeviceInterfacePropertyData failed to set custom capability property  %!STATUS!\n", status);
+            goto Error;
+        }
+
+#endif
+        WdfObjectDelete(symbolicLinkString);
     }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, DBG_PNP, "<-- OsrFxEvtDeviceAdd\n");
@@ -377,6 +405,10 @@ Return Value:
     return status;
 
 Error:
+
+    if(symbolicLinkString != NULL) {
+        WdfObjectDelete(symbolicLinkString);
+    }
 
     //
     // Log fail to add device to the event log
@@ -462,7 +494,7 @@ Return Value:
                  "WdfUsbTargetDeviceCreateWithParameters failed with Status code %!STATUS!\n", status);
             return status;
         }
- 
+
         //
         // TODO: If you are fetching configuration descriptor from device for
         // selecting a configuration or to parse other descriptors, call OsrFxValidateConfigurationDescriptor
@@ -735,7 +767,7 @@ Return Value:
     // USBD_ValidateConfigurationDescriptor validates that all descriptors are completely contained within the configuration descriptor buffer.
     // It also checks for interface numbers, number of endpoints in an interface etc.
     // Please refer to msdn documentation for this function for more information.
-    //   
+    //
 
     status = USBD_ValidateConfigurationDescriptor( ConfigDesc, BufferLength , ValidationLevel , Offset , POOL_TAG );
     if (!(NT_SUCCESS (status)) ){
@@ -744,10 +776,10 @@ Return Value:
 
     //
     // TODO: You should validate the correctness of other descriptors which are not taken care by USBD_ValidateConfigurationDescriptor
-    // Check that all such descriptors have size >= sizeof(the descriptor they point to) 
-    // Check for any association between them if required 
-    // 
-   
+    // Check that all such descriptors have size >= sizeof(the descriptor they point to)
+    // Check for any association between them if required
+    //
+
     return status;
 }
 
